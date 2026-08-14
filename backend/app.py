@@ -3,7 +3,8 @@ from flask_cors import CORS
 from datetime import date
 
 from database import get_connection, init_db
-from models import FOOD_DB, GOALS, calculate_nutrition
+from models import FOOD_DB, GOALS, calculate_nutrition, calculate_nutrition_from_dict
+import re
 
 app = Flask(__name__)
 CORS(app)  # Allow requests from the React dev server
@@ -30,15 +31,99 @@ def get_current_goal() -> str:
 
 
 # ══════════════════════════════════════════════
-#  GET /api/foods  –  list available mock foods
+#  GET /api/foods  –  list available & custom foods
 # ══════════════════════════════════════════════
 @app.route("/api/foods", methods=["GET"])
 def get_foods():
     foods = [
-        {"key": key, "name": data["display_name"]}
+        {"key": key, "name": data["display_name"], "is_custom": False}
         for key, data in FOOD_DB.items()
     ]
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM custom_foods ORDER BY id DESC").fetchall()
+    conn.close()
+
+    for r in rows:
+        foods.append({
+            "key": r["key"],
+            "name": f"⭐ {r['display_name']} (Custom)",
+            "display_name": r["display_name"],
+            "is_custom": True,
+            "calories": r["calories"],
+            "protein": r["protein"],
+            "carbs": r["carbs"],
+            "fats": r["fats"]
+        })
     return jsonify(foods)
+
+
+# ══════════════════════════════════════════════
+#  POST /api/foods  –  create a new custom food item (per 100g)
+# ══════════════════════════════════════════════
+@app.route("/api/foods", methods=["POST"])
+def create_custom_food():
+    data = request.get_json() or {}
+    display_name = data.get("display_name", "").strip()
+    if not display_name:
+        return jsonify({"error": "Food name is required"}), 400
+
+    try:
+        calories = float(data.get("calories", 0))
+        protein = float(data.get("protein", 0))
+        carbs = float(data.get("carbs", 0))
+        fats = float(data.get("fats", 0))
+    except (ValueError, TypeError):
+        return jsonify({"error": "Nutrition values must be valid numbers"}), 400
+
+    if calories < 0 or protein < 0 or carbs < 0 or fats < 0:
+        return jsonify({"error": "Nutrition values cannot be negative"}), 400
+
+    # Generate unique key
+    base_key = "custom_" + re.sub(r'[^a-z0-9]', '_', display_name.lower())
+    key = base_key
+    counter = 1
+    conn = get_connection()
+
+    while conn.execute("SELECT 1 FROM custom_foods WHERE key = ?", (key,)).fetchone() or key in FOOD_DB:
+        key = f"{base_key}_{counter}"
+        counter += 1
+
+    conn.execute(
+        """INSERT INTO custom_foods (key, display_name, calories, protein, carbs, fats)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (key, display_name, calories, protein, carbs, fats)
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "message": "Custom food created",
+        "food": {
+            "key": key,
+            "name": f"⭐ {display_name} (Custom)",
+            "display_name": display_name,
+            "is_custom": True,
+            "calories": calories,
+            "protein": protein,
+            "carbs": carbs,
+            "fats": fats
+        }
+    }), 201
+
+
+# ══════════════════════════════════════════════
+#  DELETE /api/foods/<key>  –  delete a custom food item
+# ══════════════════════════════════════════════
+@app.route("/api/foods/<string:food_key>", methods=["DELETE"])
+def delete_custom_food(food_key):
+    conn = get_connection()
+    res = conn.execute("DELETE FROM custom_foods WHERE key = ?", (food_key,))
+    conn.commit()
+    conn.close()
+
+    if res.rowcount == 0:
+        return jsonify({"error": "Custom food not found"}), 404
+    return jsonify({"message": "Custom food deleted"})
 
 
 # ══════════════════════════════════════════════
@@ -58,12 +143,6 @@ def get_meals():
 
 # ══════════════════════════════════════════════
 #  POST /api/meals  –  log a new meal
-#
-#  Expected JSON body:
-#    { "food_key": "chicken", "portion_grams": 200 }
-#  OR (for custom / image-scanned food):
-#    { "food_name": "Custom Food", "portion_grams": 150,
-#      "calories": 200, "protein": 20, "carbs": 10, "fats": 5 }
 # ══════════════════════════════════════════════
 @app.route("/api/meals", methods=["POST"])
 def add_meal():
@@ -76,12 +155,18 @@ def add_meal():
     if not portion or float(portion) <= 0:
         return jsonify({"error": "portion_grams must be a positive number"}), 400
 
-    # ── Path A: food from our predefined database ──
+    # ── Path A: food from predefined DB or custom foods table ──
     if "food_key" in data:
         food_key = data["food_key"].lower().strip()
-        if food_key not in FOOD_DB:
-            return jsonify({"error": f"Unknown food key: {food_key}"}), 400
-        nutrition = calculate_nutrition(food_key, float(portion))
+        if food_key in FOOD_DB:
+            nutrition = calculate_nutrition(food_key, float(portion))
+        else:
+            conn = get_connection()
+            cf = conn.execute("SELECT * FROM custom_foods WHERE key = ?", (food_key,)).fetchone()
+            conn.close()
+            if not cf:
+                return jsonify({"error": f"Unknown food key: {food_key}"}), 400
+            nutrition = calculate_nutrition_from_dict(dict(cf), float(portion))
 
     # ── Path B: fully custom nutrition (image-scan mock) ──
     elif "food_name" in data:

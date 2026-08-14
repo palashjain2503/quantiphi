@@ -94,6 +94,14 @@ def calculate_nutrition(food_key: str, portion_grams: float) -> dict:
     All calculations: value = value_per_100g * portion / 100
     """
     food = FOOD_DB[food_key]
+    return calculate_nutrition_from_dict(food, portion_grams)
+
+
+def calculate_nutrition_from_dict(food: dict, portion_grams: float) -> dict:
+    """
+    Given a food dict (with display_name, calories, protein, carbs, fats)
+    and portion in grams, return calculated nutrition values.
+    """
     ratio = portion_grams / 100.0
     return {
         "food_name": food["display_name"],
@@ -103,3 +111,4 @@ def calculate_nutrition(food_key: str, portion_grams: float) -> dict:
         "carbs": round(food["carbs"] * ratio, 1),
         "fats": round(food["fats"] * ratio, 1),
     }
+

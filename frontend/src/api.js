@@ -76,5 +76,17 @@ export const updateGoalTargets = (targets) =>
 
 // ── Foods ─────────────────────────────────────────────────────────────────────
 
-/** Fetch the list of available predefined foods */
+/** Fetch the list of available predefined & custom foods */
 export const getFoods = () => request("/api/foods");
+
+/** Create a new custom food item (per 100g) */
+export const createCustomFood = (foodData) =>
+  request("/api/foods", {
+    method: "POST",
+    body: JSON.stringify(foodData),
+  });
+
+/** Delete a custom food item by key */
+export const deleteCustomFood = (key) =>
+  request(`/api/foods/${key}`, { method: "DELETE" });
+

@@ -31,6 +31,19 @@ def init_db():
         )
     """)
 
+    # Custom Foods table – stores user-created food items (per 100g)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS custom_foods (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            key           TEXT UNIQUE NOT NULL,
+            display_name  TEXT NOT NULL,
+            calories      REAL NOT NULL,
+            protein       REAL NOT NULL,
+            carbs         REAL NOT NULL,
+            fats          REAL NOT NULL
+        )
+    """)
+
     # Settings table – stores goal + custom targets as a JSON blob
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS settings (

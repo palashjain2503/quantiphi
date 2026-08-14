@@ -4,16 +4,16 @@
  * Lets the user:
  *  1. Pick a food from the dropdown and enter a portion in grams → "Add Food"
  *  2. Click "📸 Scan Image" to simulate AI food recognition (mock)
+ *  3. Click "🥗 + Create Custom Food" to save a new food recipe to SQLite
  *
  * Props:
- *   foods     – array of { key, name } from GET /api/foods
- *   onMealAdded – callback after a meal is successfully added
+ *   foods           – array of { key, name, is_custom } from GET /api/foods
+ *   onMealAdded     – callback after a meal is successfully added
+ *   onFoodsUpdated  – callback after a custom food item is created
  */
 import { useState, useRef } from "react";
-import { addMealByKey, addMealCustom } from "../api.js";
+import { addMealByKey, addMealCustom, createCustomFood } from "../api.js";
 
-// Mock AI scanner: maps uploaded file names (case-insensitive)
-// to predefined food keys, then returns random realistic values.
 const MOCK_SCAN_RESULTS = [
   { food_name: "Grilled Chicken (Scanned)", portion_grams: 180, calories: 297, protein: 55.8, carbs: 0, fats: 6.5 },
   { food_name: "Brown Rice Bowl (Scanned)",  portion_grams: 250, calories: 325, protein: 6.8, carbs: 70.5, fats: 0.8 },
@@ -22,16 +22,26 @@ const MOCK_SCAN_RESULTS = [
   { food_name: "Paneer Tikka (Scanned)",     portion_grams: 150, calories: 397, protein: 27.4, carbs: 1.8, fats: 31.2 },
 ];
 
-export default function FoodForm({ foods, onMealAdded }) {
+export default function FoodForm({ foods, onMealAdded, onFoodsUpdated }) {
   const [selectedFood, setSelectedFood] = useState("");
   const [portion, setPortion] = useState("");
   const [loading, setLoading] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [error, setError] = useState("");
-  const [scanResult, setScanResult] = useState(null);  // holds mock scan data
+  const [scanResult, setScanResult] = useState(null);
   const fileInputRef = useRef(null);
 
-  // ── Submit food from dropdown ────────────────────────────────────────────────
+  // ── Custom Food Modal state ──────────────────────────────────────────
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customCal, setCustomCal] = useState("");
+  const [customProtein, setCustomProtein] = useState("");
+  const [customCarbs, setCustomCarbs] = useState("");
+  const [customFats, setCustomFats] = useState("");
+  const [customSaving, setCustomSaving] = useState(false);
+  const [customError, setCustomError] = useState("");
+
+  // ── Submit food from dropdown ────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
@@ -45,7 +55,7 @@ export default function FoodForm({ foods, onMealAdded }) {
       setSelectedFood("");
       setPortion("");
       setScanResult(null);
-      onMealAdded();   // tell parent to refresh
+      onMealAdded();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -53,7 +63,7 @@ export default function FoodForm({ foods, onMealAdded }) {
     }
   }
 
-  // ── Mock image scan ──────────────────────────────────────────────────────────
+  // ── Mock image scan ──────────────────────────────────────────────────
   function handleScanClick() {
     fileInputRef.current?.click();
   }
@@ -66,19 +76,14 @@ export default function FoodForm({ foods, onMealAdded }) {
     setError("");
     setScanResult(null);
 
-    // Simulate a 1.5-second "AI processing" delay
     await new Promise((r) => setTimeout(r, 1500));
 
-    // Pick a random mock result
     const mock = MOCK_SCAN_RESULTS[Math.floor(Math.random() * MOCK_SCAN_RESULTS.length)];
     setScanResult(mock);
     setScanLoading(false);
-
-    // Reset file input so the same file can be picked again
     e.target.value = "";
   }
 
-  // ── Submit scan result ───────────────────────────────────────────────────────
   async function handleScanSubmit() {
     if (!scanResult) return;
     setLoading(true);
@@ -101,11 +106,64 @@ export default function FoodForm({ foods, onMealAdded }) {
     }
   }
 
+  // ── Create Custom Food Handler ───────────────────────────────────────
+  async function handleSaveCustomFood(e) {
+    e.preventDefault();
+    setCustomError("");
+
+    if (!customName.trim()) {
+      setCustomError("Please enter a food name.");
+      return;
+    }
+    if (customCal === "" || Number(customCal) < 0) {
+      setCustomError("Enter valid calories per 100g.");
+      return;
+    }
+
+    setCustomSaving(true);
+    try {
+      const res = await createCustomFood({
+        display_name: customName.trim(),
+        calories: Number(customCal),
+        protein: Number(customProtein || 0),
+        carbs: Number(customCarbs || 0),
+        fats: Number(customFats || 0),
+      });
+
+      // Refresh food list in parent & auto-select the newly created food
+      if (onFoodsUpdated) {
+        await onFoodsUpdated();
+      }
+      setSelectedFood(res.food.key);
+      setShowCustomModal(false);
+
+      // Reset form
+      setCustomName("");
+      setCustomCal("");
+      setCustomProtein("");
+      setCustomCarbs("");
+      setCustomFats("");
+    } catch (err) {
+      setCustomError(err.message);
+    } finally {
+      setCustomSaving(false);
+    }
+  }
+
   return (
     <div className="card food-form-card">
-      <h2 className="section-title">🍽️ Log Food</h2>
+      <div className="food-form-header">
+        <h2 className="section-title" style={{ marginBottom: 0 }}>🍽️ Log Food</h2>
+        <button
+          type="button"
+          className="btn btn-ghost btn-custom-food-trigger"
+          onClick={() => setShowCustomModal(true)}
+        >
+          ➕ Create Custom Food
+        </button>
+      </div>
 
-      <form id="food-form" onSubmit={handleSubmit} className="food-form">
+      <form id="food-form" onSubmit={handleSubmit} className="food-form" style={{ marginTop: "16px" }}>
         {/* Food dropdown */}
         <div className="form-group">
           <label htmlFor="food-select">Food</label>
@@ -205,6 +263,115 @@ export default function FoodForm({ foods, onMealAdded }) {
             >
               ✕ Discard
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Custom Food Creator Modal ────────────────────────────────────── */}
+      {showCustomModal && (
+        <div className="modal-overlay" onClick={() => setShowCustomModal(false)}>
+          <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header-row">
+              <div>
+                <h2 className="modal-title" style={{ textAlign: "left", margin: 0, color: "#fff" }}>
+                  🥗 Create Custom Food
+                </h2>
+                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "4px 0 0" }}>
+                  Add a new food or recipe to your custom library (values per 100g).
+                </p>
+              </div>
+              <button className="btn btn-ghost btn-close" onClick={() => setShowCustomModal(false)}>
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCustomFood} className="custom-food-creator-form">
+              <div className="form-group" style={{ marginBottom: "14px" }}>
+                <label htmlFor="custom-food-name">Food Name</label>
+                <input
+                  id="custom-food-name"
+                  type="text"
+                  placeholder="e.g. Protein Whey Shake / Homemade Oats"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="target-input-grid">
+                <div className="form-group">
+                  <label htmlFor="custom-cal">Calories (kcal per 100g)</label>
+                  <input
+                    id="custom-cal"
+                    type="number"
+                    min="0"
+                    max="10000"
+                    placeholder="e.g. 370"
+                    value={customCal}
+                    onChange={(e) => setCustomCal(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="custom-protein">Protein (g per 100g)</label>
+                  <input
+                    id="custom-protein"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="e.g. 75.0"
+                    value={customProtein}
+                    onChange={(e) => setCustomProtein(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="custom-carbs">Carbs (g per 100g)</label>
+                  <input
+                    id="custom-carbs"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="e.g. 6.0"
+                    value={customCarbs}
+                    onChange={(e) => setCustomCarbs(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="custom-fats">Fats (g per 100g)</label>
+                  <input
+                    id="custom-fats"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="e.g. 2.5"
+                    value={customFats}
+                    onChange={(e) => setCustomFats(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {customError && <p className="form-error" style={{ marginBottom: "14px" }}>⚠️ {customError}</p>}
+
+              <div className="modal-footer-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setShowCustomModal(false)}
+                  disabled={customSaving}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={customSaving}>
+                  {customSaving ? "Saving…" : "💾 Save to Food Library"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

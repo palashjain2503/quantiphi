@@ -37,12 +37,16 @@ export default function App() {
     }
   }, []);
 
-  // ── Load foods list once on mount ────────────────────────────────────────────
-  useEffect(() => {
+  const fetchFoods = useCallback(() => {
     getFoods()
       .then(setFoods)
       .catch(() => setGlobalError("Failed to load food list from backend."));
   }, []);
+
+  // ── Load foods list once on mount ────────────────────────────────────────────
+  useEffect(() => {
+    fetchFoods();
+  }, [fetchFoods]);
 
   // ── Initial data load ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -74,7 +78,7 @@ export default function App() {
         <Dashboard data={dashboard} />
 
         {/* Food form */}
-        <FoodForm foods={foods} onMealAdded={refresh} />
+        <FoodForm foods={foods} onMealAdded={refresh} onFoodsUpdated={fetchFoods} />
 
         {/* Meal history */}
         <MealList meals={meals} onMealDeleted={refresh} />

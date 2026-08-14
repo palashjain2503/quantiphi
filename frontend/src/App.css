@@ -431,6 +431,26 @@ body {
 }
 
 /* ── Food Form card ────────────────────────────────────────────────── */
+.food-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-custom-food-trigger {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  color: var(--emerald);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.btn-custom-food-trigger:hover {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: var(--emerald);
+}
+
 .food-form {
   display: flex;
   flex-direction: column;
