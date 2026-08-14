@@ -212,7 +212,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .btn-close {
@@ -224,8 +224,9 @@ body {
   display: flex;
   gap: 6px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   padding-bottom: 8px;
+  overflow-x: auto;
 }
 
 .edit-tab {
@@ -237,6 +238,7 @@ body {
   padding: 8px 14px;
   border-radius: 8px;
   cursor: pointer;
+  white-space: nowrap;
   transition: all var(--transition);
 }
 
@@ -254,17 +256,26 @@ body {
 .target-input-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
 .modal-footer-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   border-top: 1px solid var(--border);
-  padding-top: 18px;
+  padding-top: 16px;
   margin-top: 10px;
+}
+
+.modal-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* ── Dashboard card ────────────────────────────────────────────────── */
@@ -746,12 +757,15 @@ body {
   background: var(--surface);
   border: 1px solid rgba(220,38,38,0.4);
   border-radius: var(--radius);
-  padding: 36px 32px;
+  padding: 28px 24px;
   max-width: 420px;
   width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
   text-align: center;
   box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(220,38,38,0.15);
   animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-sizing: border-box;
 }
 
 @keyframes slideUp {
@@ -817,6 +831,25 @@ body {
 
   .macro-grid {
     grid-template-columns: 1fr;
+  }
+
+  .target-input-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-footer-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-footer-right {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .modal-footer-actions .btn,
+  .modal-footer-right .btn {
+    width: 100%;
   }
 
   .form-actions {

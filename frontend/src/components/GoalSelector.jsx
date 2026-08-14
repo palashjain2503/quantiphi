@@ -254,7 +254,7 @@ export default function GoalSelector({ currentGoal, onGoalChange }) {
                   🔄 Reset Defaults
                 </button>
 
-                <div style={{ display: "flex", gap: "10px" }}>
+                <div className="modal-footer-right">
                   <button
                     type="button"
                     className="btn btn-ghost"
