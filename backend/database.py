@@ -31,13 +31,21 @@ def init_db():
         )
     """)
 
-    # Settings table – stores a single row for the user's current fitness goal
+    # Settings table – stores goal + custom targets as a JSON blob
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS settings (
-            id   INTEGER PRIMARY KEY,
-            goal TEXT NOT NULL DEFAULT 'maintenance'
+            id              INTEGER PRIMARY KEY,
+            goal            TEXT NOT NULL DEFAULT 'maintenance',
+            custom_targets  TEXT            -- JSON blob, nullable
         )
     """)
+
+    # Safe migration: add custom_targets column to existing databases
+    # that were created before this column existed.
+    try:
+        cursor.execute("ALTER TABLE settings ADD COLUMN custom_targets TEXT")
+    except Exception:
+        pass  # Column already exists — no problem
 
     # Seed the settings row if it doesn't exist yet
     cursor.execute("SELECT COUNT(*) FROM settings")

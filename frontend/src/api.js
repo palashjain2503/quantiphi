@@ -64,6 +64,16 @@ export const setGoal = (goal) =>
     body: JSON.stringify({ goal }),
   });
 
+/** Get all goals and their current targets */
+export const getGoals = () => request("/api/goals");
+
+/** Update custom targets for goals */
+export const updateGoalTargets = (targets) =>
+  request("/api/goals/custom", {
+    method: "POST",
+    body: JSON.stringify({ targets }),
+  });
+
 // ── Foods ─────────────────────────────────────────────────────────────────────
 
 /** Fetch the list of available predefined foods */

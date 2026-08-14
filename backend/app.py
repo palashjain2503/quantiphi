@@ -132,13 +132,73 @@ def delete_meal(meal_id):
     return jsonify({"message": "Meal deleted"})
 
 
+import json
+import copy
+
+# ──────────────────────────────────────────────
+#  Helper – fetch all goals merged with custom targets from DB
+# ──────────────────────────────────────────────
+def get_goals_dict() -> dict:
+    conn = get_connection()
+    row = conn.execute("SELECT custom_targets FROM settings WHERE id = 1").fetchone()
+    conn.close()
+
+    goals_data = copy.deepcopy(GOALS)
+
+    if row and row["custom_targets"]:
+        try:
+            custom = json.loads(row["custom_targets"])
+            for g_key, g_val in custom.items():
+                if g_key in goals_data and isinstance(g_val, dict):
+                    for field in ["calories", "protein", "carbs", "fats"]:
+                        if field in g_val:
+                            goals_data[g_key][field] = float(g_val[field])
+        except Exception:
+            pass
+
+    return goals_data
+
+
+# ══════════════════════════════════════════════
+#  GET /api/goals  –  get available goals & custom targets
+# ══════════════════════════════════════════════
+@app.route("/api/goals", methods=["GET"])
+def get_goals_route():
+    return jsonify({
+        "current_goal": get_current_goal(),
+        "goals": get_goals_dict()
+    })
+
+
+# ══════════════════════════════════════════════
+#  POST /api/goals/custom  –  update custom targets for goals
+#  Body: { "targets": { "weight_loss": { "calories": 1600, ... } } }
+#  Or { "targets": null } to reset to defaults
+# ══════════════════════════════════════════════
+@app.route("/api/goals/custom", methods=["POST"])
+def update_custom_targets():
+    data = request.get_json() or {}
+    targets_payload = data.get("targets")
+
+    conn = get_connection()
+    if targets_payload is None:
+        conn.execute("UPDATE settings SET custom_targets = NULL WHERE id = 1")
+    else:
+        conn.execute("UPDATE settings SET custom_targets = ? WHERE id = 1", (json.dumps(targets_payload),))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Goal targets updated", "goals": get_goals_dict()})
+
+
 # ══════════════════════════════════════════════
 #  GET /api/dashboard  –  daily totals + targets
 # ══════════════════════════════════════════════
 @app.route("/api/dashboard", methods=["GET"])
 def get_dashboard():
     goal_key = get_current_goal()
-    targets = GOALS[goal_key]
+    all_goals = get_goals_dict()
+    targets = all_goals.get(goal_key, GOALS["maintenance"])
 
     conn = get_connection()
     rows = conn.execute(
